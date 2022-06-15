@@ -11,20 +11,24 @@ scale2 <- function(x, na.rm = FALSE) (x - mean(x, na.rm = na.rm)) / sd(x, na.rm)
 
 library(plyr)
 library(readr)
+#Mac
 mydir <- "raw"
 myfiles <- list.files(path=mydir, pattern="*.csv", full.names=TRUE)
 dat_csv <- ldply(myfiles, read_csv)
-adypocites<-dat_csv
-#paste all dataframes together 
-#adypocites<-rbind(BxPC.3.negative,CFPANC.negative)
-#adypocites<-rbind(AsPC.1.2neg,BxPC.3.1neg,CFPAC.1.2neg,HeLa.1neg,PANC.1.3neg,panc.10.05neg)
-#adypocites<-rbind(AsPC.1,BxPC.3,cfpan.1,HeLa,panc.10.05,PANC.1)
+cells<-dat_csv
+#Windows
 
-#adypocites <- rbind(KC, WT)
-adypocites$id <- paste(adypocites$sample, "_", adypocites$spectranum)
+temp = list.files(pattern="csv$")
+
+cells <- lapply(temp, read_csv) %>% 
+  bind_rows() 
+#Add id as unique identifier for all every spectrum
+cells$id<-gsub(" ", "_", paste(cells$sample,cells$spectranum))
+
+#cells$id <- paste(cells$sample, "_", cells$spectranum)
 #remove all white spaces
-adypocites$id <- gsub('\\s+', '', adypocites$id)
-cells<-filter(adypocites, between(mz, 782.5616, 782.5695)) 
+#cells$id <- gsub('\\s+', '', cells$id)
+cells<-filter(cells, between(mz, 782.5616, 782.5695)) 
 ########get the spectrum number from the spectrum with a signal for adipo
 cellsidx<-cells$id
 
@@ -32,7 +36,7 @@ cellsidx<-cells$id
 cellspectrum<-tibble()
 for (i in 1:length(cellsidx)) {
   idx<-cellsidx[i]
-  spectraadipoidx<-filter(adypocites, spectranum == idx)
+  spectraadipoidx<-filter(cells, spectranum == idx)
   cellspectrum = rbind(cellspectrum,spectraadipoidx)
 }
 ####round intensity to 4 digits
@@ -50,17 +54,17 @@ normspectramatrix$int_norm <- normspectramatrix$intensity/normspectramatrix$int_
 
 
 res <- 0.007
-mzmin<- min(adypocites$mz) - res
-mzmax <- max(adypocites$mz) + res
+mzmin<- min(cells$mz) - res
+mzmax <- max(cells$mz) + res
 len <-(mzmax - mzmin) / res
 mz <- seq( from=mzmin, to=mzmax, length=len )
 binned_data<-matrix()
 
-adypocites$mz<-round(adypocites$mz, digits = 4)
-bins2<-adypocites %>%
+cells$mz<-round(cells$mz, digits = 4)
+bins2<-cells %>%
   #group_by(sample)%>%
   mutate(bin = cut(mz, breaks = seq(mzmin, mzmax, by = 0.001))) 
-spectrumpersample<-plyr::count(adypocites$id)
+spectrumpersample<-plyr::count(cells$id)
 n<-nrow(spectrumpersample)
 cutoff <- 0.2 *n
 
@@ -247,7 +251,7 @@ hist(treesize(rf),
      main = "No. of Nodes for the Trees",
      col = "green")
 #Variable Importance
-tiff(filename = "All_adypocites_gini.tiff",
+tiff(filename = "All_cells_gini.tiff",
      width = 30, height = 20, units = "cm",res=1500)
 varImpPlot(rf,
            sort = T,

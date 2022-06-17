@@ -165,18 +165,18 @@ class(boruta.df)
 
 
 
-test2<-test2 %>% 
+features<-features %>% 
   mutate_if(is.numeric, round,digits=4)
 
 #transpose the matrix including column names as a column called featur
-trans_test2<- data.table::transpose(test2,keep.names = "feature")
+trans_test2<- data.table::transpose(features,keep.names = "feature")
 trans_test2<-trans_test2[-2,]
 trans_test2<-as_tibble(trans_test2)
 
 ####Get selected features from the table
-keep<- c("sample", "spectranum", selected_features)
+keep<- c("sample", "id", selected_features)
 
-df <- test2[keep]
+df <- features[keep]
 
 
 

@@ -38,196 +38,145 @@ featureMatrix<-intensityMatrix(peaks)
 
 ## Replace NAN values by 0
 featureMatrix[is.na(featureMatrix)] <- 0
-####uncomment this to get the features matrix as a csv
-#write.csv(featureMatrix,"featureMatrix.csv")
-
+#find a way to add labels
 ## Normalize spectra
+#remove all features with more than 20% values by class
+features<-as_tibble(featureMatrix,.name_repair = ~ make.names(., unique = TRUE))
+features %>% mutate(frac = colSums(.[-1] > 0) / ncol(.[-1])) %>% filter(frac > 0.2)
+df  %>%
+  select(where(~ colSums(.) > 10))
 
-normout_featureMatrix<-normalize.rows(featureMatrix)
-samplenames<-gsub(".mzML","",mzML_list)
-rownames(normout_featureMatrix)<-samplenames
-colnames(normout_featureMatrix)<-colnames(featureMatrix)
+res <- colSums(features==0)/nrow(featureMatrix)*100
+res<-as_tibble(res)
+res$mz<-colnames(features)
+#select those with more than 20%
 
-###########################################################################
-##For heatmaps construction
-## Sort by columns with maximum intensity and eliminate others
+selectedft <-filter(res, value<20)
 
-#find maximal value for each column (mz-bin)
-columnmax<-apply(normout_featureMatrix, 2, max)
+ft<-selectedft$mz
 
-#sort and select the x most intense values
-colmax<-sort(columnmax,decreasing=TRUE)
-colmaxselection<-as.matrix(colmax[1:100])
-colmaxselection=as.vector(rownames(colmaxselection))
+#select all features in original tibble
+features<-features%>% select(all_of(ft))
 
-#limiting matrix to selection
-max_normout_featureMatrix<-normout_featureMatrix[,colmaxselection]
+#add labels
+features$sample<-alllabels
+features<-tibble::rowid_to_column(features, "id")
+#moving sample to first column
+features <- features %>%
+  select(id,sample, everything())
 
-## Create heatmap
 
-t_max_normout_featureMatrix<-t(max_normout_featureMatrix)
-pheatmap(t_max_normout_featureMatrix,scale="row",cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows="euclidean", clustering_distance_cols="euclidean", clustering_methode="complete",cellwidth = 10, cellheight = 10, fontsize=5, filename="metabolic-heatmapSNR0_all_100.pdf")
 
-###########################################################################
+library(randomForest)
+require(caTools)
+library(caret)
+set.seed(222)
+rfdata<-features[:]
+rfdata$sample<-as_factor(rfdata$sample)
+ind <- sample(2, nrow(rfdata), replace = TRUE, prob = c(0.7, 0.3))
+train <- rfdata[ind==1,]
+test <- rfdata[ind==2,]
 
-####for PCA construction
 
-df<-as.data.frame(normout_featureMatrix)
-flow<-c("1.5","1.5","1.5","1.0","1.0","1.0","0.5","0.5","0.5","1.5","1.5","1.5","1.0","1.0","0.5","0.5","0.5")
-lid<-c("sealed","sealed","sealed","sealed","sealed","sealed","sealed","sealed","opened","opened","opened","opened","opened","opened","opened","opened")
-voltage<-c("2.44","3.00","3.44","2.44","3.00","3.44","2.44","3.00","3.44","2.44","3.00","3.44","2.44","3.44","2.44","3.00","3.44")
-samples <-c("a","b","c","d","e","f","g","h","i","j","k","l","m","o","p","q","r")
+dim(train)
+dim(test)
 
-#Here you calculate the pca components
-res.pca <- prcomp(df,  scale = TRUE)
-#Plot PCA components change habillage to specify the parameter you want to evaluate and the tiff file
-tiff(filename = "N_flow.tiff",
-     width = 15, height = 10, units = "cm",res=1500)
-fviz_pca_ind(res.pca, label="none", habillage=flow, geom = c("point"),
-             addEllipses=TRUE, ellipse.type = "convex", ellipse.level=.8)
-  #guides(fill=guide_legend(title="Flow (L/min)"))
+
+rf <- randomForest(
+  sample ~ .,
+  data=test
+)
+#Prediction & Confusion Matrix – train data
+p1 <- predict(rf, train)
+confusionMatrix(p1, train$sample)
+#Prediction & Confusion Matrix – test data
+p2 <- predict(rf, test)
+confusionMatrix(p2, test$sample)
+
+
+hist(treesize(rf),
+     main = "No. of Nodes for the Trees",
+     col = "green")
+#Variable Importance
+tiff(filename = "All_adypocites_gini.tiff",
+     width = 30, height = 20, units = "cm",res=1500)
+varImpPlot(rf,
+           sort = T,
+           n.var = 30,
+           main = "Top 30 - Variable Importance")
 dev.off()
+importance(rf)
 
-##########PCAS with X most intense features
+capture.output(rf, file = "rf.txt", append = TRUE)
 
-
-df<-as.data.frame(max_normout_featureMatrix)
-flow<-c("1.5","1.5","1.5","1.0","1.0","1.0","0.5","0.5","0.5","1.5","1.5","1.5","1.0","1.0","0.5","0.5","0.5")
-lid<-c("sealed","sealed","sealed","sealed","sealed","sealed","sealed","sealed","opened","opened","opened","opened","opened","opened","opened","opened")
-voltage<-c("2.44","3.00","3.44","2.44","3.00","3.44","2.44","3.00","3.44","2.44","3.00","3.44","2.44","3.44","2.44","3.00","3.44")
-samples <-c("a","b","c","d","e","f","g","h","i","j","k","l","m","o","p","q","r")
-
-#Here you calculate the pca components
-res.pca <- prcomp(df,  scale = TRUE)
-#Plot PCA components change habillage to specify the parameter you want to evaluate and the tiff file
-tiff(filename = "100_flow.tiff",
-     width = 15, height = 10, units = "cm",res=1500)
-fviz_pca_ind(res.pca, label="none", habillage=flow, geom = c("point"),
-             addEllipses=TRUE, ellipse.type = "convex", ellipse.level=.8)
-#guides(fill=guide_legend(title="Flow (L/min)"))
-dev.off()
-
-###Test for specific masses to evaluate how a compound changes in a group of samples in normalized data
-
-normout_featureMatrix<-as.tibble(normout_featureMatrix)
-stats <- data.frame( )
-counter<-1
-pdf("features_normalized.pdf")
-while (counter<ncol(normout_featureMatrix)) {
-  
-  plotdt<-normout_featureMatrix%>%dplyr::pull(counter)
-  
-  boxplot(plotdt~lid,
-          main= names(normout_featureMatrix[counter]),
-          xlab="Evaluated parameter",
-          ylab="Normalized intensity",
-          col="orange",
-          border="brown"
-  )
-  start= plotdt[1:(length(plotdt)/2)]
-  end= plotdt[((length(plotdt)/2)+1):length(plotdt)]
-  #res <- wilcox.test(start,end,paired=TRUE)
-  res<-kruskal.test(list(start,end))
-  print(res)
-  
-  stats[counter,1] <- res[1]
-  stats[counter,2] <- res[2]
-  stats[counter,3] <- res[3]
-  stats[counter,4]<-names(normout_featureMatrix[counter])
-  counter=counter+1
-}
-dev.off()
-#selects significatively different features with a p value smaller than 0.001, this parameter can be modified
-sigfeatures<-subset(stats, p.value<0.001)
-sigfeaturesmasses<-sigfeatures[4]
+feat_imp_df <- importance(rf) %>% 
+  data.frame() %>% 
+  mutate(feature = row.names(.)) 
 
 
-counter<-1
-pdf("significative_features_normalized.pdf")
-while (counter<nrow(sigfeatures)) {
-  
-  mass <- sigfeaturesmasses[counter,1]
-  plotdt<-normout_featureMatrix %>% select(mass)
-  my_data <- data.frame(feature=plotdt,
-                        lid=lid)
-  colnames(my_data)[1]<-"feature"
-  group_by(my_data, lid) %>%
-    summarise(
-      count = n(),
-      median = median(feature, na.rm = TRUE),
-    )
-  my_data<-as.tibble(my_data)
-  boxplot(my_data$feature~my_data$lid,
-          main= sigfeaturesmasses[counter,1],
-          xlab="Evaluated parameter",
-          ylab="Normalized intensity",
-          col="orange",
-          border="brown"
-  )
-  
-  counter=counter+1
-}
-dev.off()
-##################################
-#Same in non normalized data
-###Test for specific masses to evaluate how a compound changes in a group of samples in normalized data
+library(Rtsne)
 
-featureMatrix<-as.tibble(featureMatrix)
-stats <- data.frame( )
-counter<-1
-pdf("features.pdf")
-while (counter<ncol(featureMatrix)) {
-  
-  plotdt<-featureMatrix%>%dplyr::pull(counter)
-  
-  boxplot(plotdt~lid,
-          main= names(normout_featureMatrix[counter]),
-          xlab="Evaluated parameter",
-          ylab="Absolut intensity",
-          col="orange",
-          border="brown"
-  )
-  start= plotdt[1:(length(plotdt)/2)]
-  end= plotdt[((length(plotdt)/2)+1):length(plotdt)]
-  #res <- wilcox.test(start,end,paired=TRUE)
-  res<-kruskal.test(list(start,end))
-  print(res)
-  
-  stats[counter,1] <- res[1]
-  stats[counter,2] <- res[2]
-  stats[counter,3] <- res[3]
-  stats[counter,4]<-names(normout_featureMatrix[counter])
-  counter=counter+1
-}
-dev.off()
-#selects significatively different features with a p value smaller than 0.05, this parameter can be modified
-sigfeatures<-subset(stats, p.value<0.05)
+## Curating the database for analysis with both t-SNE and PCA
+Labels<-features$sample
+features$sample<-as.factor(features$sample)
+## for plotting
+colors = rainbow(length(unique(features$sample)))
+names(colors) = unique(features$sample)
+
+## Executing the algorithm on curated data
+tsne <- Rtsne(features[,3:301], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
+#get labels
+spectranumcol<-features$id
+samplecol<-features$sample
+tSNE_df <- tsne$Y %>% 
+  as.data.frame() %>%
+  dplyr::rename(tsne1="V1",
+                tsne2="V2") %>%
+  mutate(sample=samplecol, spectranum=spectranumcol)
+
+
+tSNE_df %>%
+  ggplot(aes(x = tsne1, 
+             y = tsne2,
+             color = sample))+
+  geom_point()+
+  theme(legend.position="bottom")
+ggsave("tSNE_all_maldiquant.png")
+
+#Boruta
+library(Boruta)
+boruta <- Boruta(sample ~ ., data = rfdata, doTrace = 1, maxRuns = 100)
+
+print(boruta)
+
+
+plot(boruta, xlab = "", xaxt = "n")
+lz<-lapply(1:ncol(boruta$ImpHistory),function(i)
+  boruta$ImpHistory[is.finite(boruta$ImpHistory[,i]),i])
+names(lz) <- colnames(boruta$ImpHistory)
+Labels <- sort(sapply(lz,median))
+
+axis(side = 1,las=2,labels = names(Labels),
+     at = 1:ncol(boruta$ImpHistory), cex.axis = 0.7)
+#Select features
+selected_features<-getSelectedAttributes(boruta, withTentative = F)
+boruta.df <- attStats(boruta)
+class(boruta.df)
 
 
 
-counter<-1
-pdf("significative_features.pdf")
-while (counter<nrow(sigfeatures)) {
-  
-  mass <- sigfeaturesmasses[counter,1]
-  plotdt<-normout_featureMatrix %>% select(mass)
-  my_data <- data.frame(feature=plotdt,
-                        lid=lid)
-  colnames(my_data)[1]<-"feature"
-  group_by(my_data, lid) %>%
-    summarise(
-      count = n(),
-      median = median(feature, na.rm = TRUE),
-    )
-  my_data<-as.tibble(my_data)
-  boxplot(my_data$feature~my_data$lid,
-          main= sigfeaturesmasses[counter,1],
-          xlab="Evaluated parameter",
-          ylab="Absolute intensity",
-          col="orange",
-          border="brown"
-  )
-  
-  counter=counter+1
-}
-dev.off()
+test2<-test2 %>% 
+  mutate_if(is.numeric, round,digits=4)
+
+#transpose the matrix including column names as a column called featur
+trans_test2<- data.table::transpose(test2,keep.names = "feature")
+trans_test2<-trans_test2[-2,]
+trans_test2<-as_tibble(trans_test2)
+
+####Get selected features from the table
+keep<- c("sample", "spectranum", selected_features)
+
+df <- test2[keep]
+
+
+

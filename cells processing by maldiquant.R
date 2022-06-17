@@ -178,5 +178,18 @@ keep<- c("sample", "id", selected_features)
 
 df <- features[keep]
 
+####clases file from python
+names<-colnames(clusters)
+names<-sub('X', '', names)
+names<-names[3:161]
+names<-as.numeric(names)
+names<-round(names,digits=4)
+names<-as.character(names)
+#names<-names[names > 400]
+#add X to characters
+names<-paste0("X", names)
+labels<-c("sample","id",names,"hdb_prob", "hdb_cluster")
+colnames(clusters)<-labels
+
 
 

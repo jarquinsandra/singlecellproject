@@ -1,12 +1,12 @@
 library(tidyverse)
 library(rstatix)
 library(ggpubr)
-
+library(viridis)
 #select each feature by group
 
 testdata<-clusters[-1]
 testdata<-testdata[-1]
-testdata<-testdata[-269]
+testdata<-testdata[-160]
 stats <- data.frame( )
 counter<-1
 pdf("features_normalizedscaled.pdf")

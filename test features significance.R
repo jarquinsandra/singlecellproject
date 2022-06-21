@@ -1,15 +1,15 @@
 library(tidyverse)
 library(rstatix)
 library(ggpubr)
-
+library(viridis)
 #select each feature by group
 
 testdata<-clusters[-1]
 testdata<-testdata[-1]
-testdata<-testdata[-269]
+testdata<-testdata[-160]
 stats <- data.frame( )
 counter<-1
-pdf("features_normalizedscaled.pdf")
+#pdf("features_normalizedscaled.pdf")
 while (counter<ncol(testdata)-1) {
   
   plotdt<-testdata%>%dplyr::pull(counter)
@@ -19,7 +19,7 @@ while (counter<ncol(testdata)-1) {
   feature<-colnames(testdata[counter])
     pwc <- testvalues %>%
     pairwise_t_test(plotdt ~ labels, p.adjust.method = "bonferroni")
-  pwc
+  print(pwc)
   testvalues$labels<-as.factor(testvalues$labels)
   # p1<-testvalues %>%
   #   ggplot( aes(y=plotdt, x=labels)) +
@@ -53,7 +53,7 @@ while (counter<ncol(testdata)-1) {
     #print(p1)
     print(p2)
 }
-dev.off()
+#dev.off()
 
 #res <- wilcox.test(start,end,paired=TRUE)
 res<-kruskal.test(list(start,end))

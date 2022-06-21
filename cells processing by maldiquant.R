@@ -57,7 +57,10 @@ ft<-selectedft$mz
 
 #select all features in original tibble
 features<-features%>% select(all_of(ft))
-
+#3679 KC + 3933 WT 
+KC<-replicate(3679, "KC")
+WT<-replicate(3933, "WT")
+alllabels<-c(KC,WT)
 #add labels
 features$sample<-alllabels
 features<-tibble::rowid_to_column(features, "id")
@@ -71,7 +74,7 @@ library(randomForest)
 require(caTools)
 library(caret)
 set.seed(222)
-rfdata<-features[:]
+rfdata<-features[,2:301]
 rfdata$sample<-as_factor(rfdata$sample)
 ind <- sample(2, nrow(rfdata), replace = TRUE, prob = c(0.7, 0.3))
 train <- rfdata[ind==1,]
@@ -177,6 +180,15 @@ trans_test2<-as_tibble(trans_test2)
 keep<- c("sample", "id", selected_features)
 
 df <- features[keep]
+
+#get only confirmed features
+boruta.df<-filter(boruta.df, decision=='Confirmed')
+mz<-rownames(boruta.df)
+boruta.df$mz<-mz
+boruta.df$mz<-gsub("X","",boruta.df$mz)
+boruta.df$mz<-as.numeric(boruta.df$mz)
+boruta.df<-as_tibble(boruta.df)
+write.csv(boruta.df, file='featuresimportance.csv') 
 
 ####clases file from python
 names<-colnames(clusters)

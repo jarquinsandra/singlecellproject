@@ -28,9 +28,9 @@ cells$id<-gsub(" ", "_", paste(cells$sample,cells$spectranum))
 #cells$id <- paste(cells$sample, "_", cells$spectranum)
 #remove all white spaces
 #cells$id <- gsub('\\s+', '', cells$id)
-cells<-filter(cells, between(mz, 782.5616, 782.5695)) 
+cellsbymass<-filter(cells, between(mz, 782.5616, 782.5695)) 
 ########get the spectrum number from the spectrum with a signal for adipo
-cellsidx<-cells$id
+cellsidx<-cellsbymass$id
 
 #####Get complete spectrum from the spectrum with a adipo signal
 cellspectrum<-tibble()
@@ -41,7 +41,7 @@ for (i in 1:length(cellsidx)) {
 }
 ####round intensity to 4 digits
 
-cellspectrum$mz<-round(adipospectrum$mz,digits = 4)
+cellspectrum$mz<-round(cellspectrum$mz,digits = 4)
 max_int<- cellspectrom %>% 
  dplyr::group_by(id) %>% 
 dplyr::summarise(int_max = max(intensity)) 
@@ -60,7 +60,7 @@ len <-(mzmax - mzmin) / res
 mz <- seq( from=mzmin, to=mzmax, length=len )
 binned_data<-matrix()
 
-cells$mz<-round(cells$mz, digits = 4)
+#cells$mz<-round(cells$mz, digits = 4)
 bins2<-cells %>%
   #group_by(sample)%>%
   mutate(bin = cut(mz, breaks = seq(mzmin, mzmax, by = 0.001))) 

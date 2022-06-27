@@ -42,21 +42,12 @@ featureMatrix[is.na(featureMatrix)] <- 0
 ## Normalize spectra
 #remove all features with more than 20% values by class
 features<-as_tibble(featureMatrix,.name_repair = ~ make.names(., unique = TRUE))
-features %>% mutate(frac = colSums(.[-1] > 0) / ncol(.[-1])) %>% filter(frac > 0.2)
-df  %>%
-  select(where(~ colSums(.) > 10))
+#Remove columns that have more than 20% 0 values
+zerocutoff<-nrow(features)*0.2
 
-res <- colSums(features==0)/nrow(featureMatrix)*100
-res<-as_tibble(res)
-res$mz<-colnames(features)
-#select those with more than 20%
+features[colSums(features > 0) <= zerocutoff]<- NULL
+apply( features , 2 , function(x) sum ( x == 0 ) )
 
-selectedft <-filter(res, value<20)
-
-ft<-selectedft$mz
-
-#select all features in original tibble
-features<-features%>% select(all_of(ft))
 #3679 KC + 3933 WT 
 KC<-replicate(3679, "KC")
 WT<-replicate(3933, "WT")
@@ -68,13 +59,15 @@ features<-tibble::rowid_to_column(features, "id")
 features <- features %>%
   select(id,sample, everything())
 
-
+#filter rows by mass to select cells
+cells<-features[!(features$X782.565591685428==0|features$X760.581056660418)==0,]
+#df2<-df1[!(df1$Name=="George" | df1$Name=="Andrea"),]
 
 library(randomForest)
 require(caTools)
 library(caret)
 set.seed(222)
-rfdata<-features[,2:301]
+rfdata<-cells[,2:765]
 rfdata$sample<-as_factor(rfdata$sample)
 ind <- sample(2, nrow(rfdata), replace = TRUE, prob = c(0.7, 0.3))
 train <- rfdata[ind==1,]
@@ -120,17 +113,17 @@ feat_imp_df <- importance(rf) %>%
 library(Rtsne)
 
 ## Curating the database for analysis with both t-SNE and PCA
-Labels<-features$sample
-features$sample<-as.factor(features$sample)
+Labels<-cells$sample
+cells$sample<-as.factor(cells$sample)
 ## for plotting
-colors = rainbow(length(unique(features$sample)))
-names(colors) = unique(features$sample)
+colors = rainbow(length(unique(cells$sample)))
+names(colors) = unique(cells$sample)
 
 ## Executing the algorithm on curated data
-tsne <- Rtsne(features[,3:301], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
+tsne <- Rtsne(cells[,3:765], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
 #get labels
-spectranumcol<-features$id
-samplecol<-features$sample
+spectranumcol<-cells$id
+samplecol<-cells$sample
 tSNE_df <- tsne$Y %>% 
   as.data.frame() %>%
   dplyr::rename(tsne1="V1",
@@ -144,64 +137,88 @@ tSNE_df %>%
              color = sample))+
   geom_point()+
   theme(legend.position="bottom")
-ggsave("tSNE_all_maldiquant.png")
+ggsave("tSNE_all_maldiquant_cellsfilter.png")
 
 #Boruta
 library(Boruta)
 boruta <- Boruta(sample ~ ., data = rfdata, doTrace = 1, maxRuns = 100)
 
 print(boruta)
-
+tiff(filename = "borutatest.tiff",
+     width = 55, height = 25, units = "cm",res=1500)
 
 plot(boruta, xlab = "", xaxt = "n")
 lz<-lapply(1:ncol(boruta$ImpHistory),function(i)
   boruta$ImpHistory[is.finite(boruta$ImpHistory[,i]),i])
 names(lz) <- colnames(boruta$ImpHistory)
 Labels <- sort(sapply(lz,median))
+dev.off()
+
 
 axis(side = 1,las=2,labels = names(Labels),
      at = 1:ncol(boruta$ImpHistory), cex.axis = 0.7)
-#Select features
-selected_features<-getSelectedAttributes(boruta, withTentative = F)
+#Select cells
+selected_cells<-getSelectedAttributes(boruta, withTentative = F)
 boruta.df <- attStats(boruta)
 class(boruta.df)
 
 
 
-features<-features %>% 
+cells<-cells %>% 
   mutate_if(is.numeric, round,digits=4)
 
 #transpose the matrix including column names as a column called featur
-trans_test2<- data.table::transpose(features,keep.names = "feature")
+trans_test2<- data.table::transpose(cells,keep.names = "feature")
 trans_test2<-trans_test2[-2,]
 trans_test2<-as_tibble(trans_test2)
 
-####Get selected features from the table
-keep<- c("sample", "id", selected_features)
+####Get selected cells from the table
+keep<- c("sample", "id", selected_cells)
 
-df <- features[keep]
+df <- cells[keep]
 
-#get only confirmed features
+#get only confirmed cells
 boruta.df<-filter(boruta.df, decision=='Confirmed')
 mz<-rownames(boruta.df)
+mz<-sub('X', '', mz)
+mz<-as.numeric(mz)
+mz<-round(mz,digits=4)
+mz<-as.character(mz)
+mz<-paste0("X", mz)
 boruta.df$mz<-mz
 boruta.df$mz<-gsub("X","",boruta.df$mz)
 boruta.df$mz<-as.numeric(boruta.df$mz)
 boruta.df<-as_tibble(boruta.df)
-write.csv(boruta.df, file='featuresimportance.csv') 
 
-####clases file from python
-names<-colnames(clusters)
+#Remove weird extra numbers after the decimal point
+
+names<-colnames(df)
 names<-sub('X', '', names)
-names<-names[3:161]
+names<-names[3:166]
 names<-as.numeric(names)
 names<-round(names,digits=4)
 names<-as.character(names)
 #names<-names[names > 400]
 #add X to characters
 names<-paste0("X", names)
-labels<-c("sample","id",names,"hdb_prob", "hdb_cluster")
-colnames(clusters)<-labels
+labels<-c("sample","id",names)
+colnames(df)<-labels
+write.csv(boruta.df, file='cellsimportance.csv') 
+write.csv(df, file='cellsborutaselectedfeatures_filtered.csv') 
+
+
+####clases file from python
+# names<-colnames(clusters)
+# names<-sub('X', '', names)
+# names<-names[3:161]
+# names<-as.numeric(names)
+# names<-round(names,digits=4)
+# names<-as.character(names)
+#names<-names[names > 400]
+#add X to characters
+# names<-paste0("X", names)
+# labels<-c("sample","id",names,"hdb_prob", "hdb_cluster")
+# colnames(clusters)<-labels
 
 
 

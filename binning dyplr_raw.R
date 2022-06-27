@@ -36,7 +36,7 @@ cellsidx<-cellsbymass$id
 cellspectrum<-tibble()
 for (i in 1:length(cellsidx)) {
   idx<-cellsidx[i]
-  spectraadipoidx<-filter(cells, spectranum == idx)
+  spectraadipoidx<-filter(cells, id == idx)
   cellspectrum = rbind(cellspectrum,spectraadipoidx)
 }
 ####round intensity to 4 digits

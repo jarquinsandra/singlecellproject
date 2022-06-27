@@ -144,13 +144,16 @@ library(Boruta)
 boruta <- Boruta(sample ~ ., data = rfdata, doTrace = 1, maxRuns = 100)
 
 print(boruta)
-
+tiff(filename = "borutatest.tiff",
+     width = 55, height = 25, units = "cm",res=1500)
 
 plot(boruta, xlab = "", xaxt = "n")
 lz<-lapply(1:ncol(boruta$ImpHistory),function(i)
   boruta$ImpHistory[is.finite(boruta$ImpHistory[,i]),i])
 names(lz) <- colnames(boruta$ImpHistory)
 Labels <- sort(sapply(lz,median))
+dev.off()
+
 
 axis(side = 1,las=2,labels = names(Labels),
      at = 1:ncol(boruta$ImpHistory), cex.axis = 0.7)
@@ -177,24 +180,45 @@ df <- cells[keep]
 #get only confirmed cells
 boruta.df<-filter(boruta.df, decision=='Confirmed')
 mz<-rownames(boruta.df)
+mz<-sub('X', '', mz)
+mz<-as.numeric(mz)
+mz<-round(mz,digits=4)
+mz<-as.character(mz)
+mz<-paste0("X", mz)
 boruta.df$mz<-mz
 boruta.df$mz<-gsub("X","",boruta.df$mz)
 boruta.df$mz<-as.numeric(boruta.df$mz)
 boruta.df<-as_tibble(boruta.df)
-write.csv(boruta.df, file='cellsimportance.csv') 
 
-####clases file from python
-names<-colnames(clusters)
+#Remove weird extra numbers after the decimal point
+
+names<-colnames(df)
 names<-sub('X', '', names)
-names<-names[3:161]
+names<-names[3:166]
 names<-as.numeric(names)
 names<-round(names,digits=4)
 names<-as.character(names)
 #names<-names[names > 400]
 #add X to characters
 names<-paste0("X", names)
-labels<-c("sample","id",names,"hdb_prob", "hdb_cluster")
-colnames(clusters)<-labels
+labels<-c("sample","id",names)
+colnames(df)<-labels
+write.csv(boruta.df, file='cellsimportance.csv') 
+write.csv(df, file='cellsborutaselectedfeatures_filtered.csv') 
+
+
+####clases file from python
+# names<-colnames(clusters)
+# names<-sub('X', '', names)
+# names<-names[3:161]
+# names<-as.numeric(names)
+# names<-round(names,digits=4)
+# names<-as.character(names)
+#names<-names[names > 400]
+#add X to characters
+# names<-paste0("X", names)
+# labels<-c("sample","id",names,"hdb_prob", "hdb_cluster")
+# colnames(clusters)<-labels
 
 
 

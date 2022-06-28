@@ -48,12 +48,32 @@ zerocutoff<-nrow(features)*0.2
 features[colSums(features > 0) <= zerocutoff]<- NULL
 apply( features , 2 , function(x) sum ( x == 0 ) )
 
+####test for automatic label extraction
+i=1
+labelst<-tibble()
+for (i in 1:length(spectra)) {
+  label<-spectra[[i]]@metaData[["file"]]
+  labelst<-rbind(labelst,label)
+  i=+1
+}
+
+labels <- mutate_if(labelst, 
+                is.character, 
+                str_replace_all, 
+                pattern = "/Users/sandramartinez/Documents/MSData/mice_wtkras_20220405/raw/", 
+                replacement = "")
+labels <- mutate_if(labels, 
+                is.character, 
+                str_replace_all, 
+                pattern = ".mzML", 
+                replacement = "")
+
 #3679 KC + 3933 WT 
-KC<-replicate(3679, "KC")
-WT<-replicate(3933, "WT")
-alllabels<-c(KC,WT)
+#KC<-replicate(3679, "KC")
+#WT<-replicate(3933, "WT")
+#alllabels<-c(KC,WT)
 #add labels
-features$sample<-alllabels
+features$sample<-labels
 features<-tibble::rowid_to_column(features, "id")
 #moving sample to first column
 features <- features %>%

@@ -41,26 +41,26 @@ featureMatrix[is.na(featureMatrix)] <- 0
 #find a way to add labels
 ## Normalize spectra
 #remove all features with more than 20% values by class
+#remove all features with more than 20% values by class
 features<-as_tibble(featureMatrix,.name_repair = ~ make.names(., unique = TRUE))
-features %>% mutate(frac = colSums(.[-1] > 0) / ncol(.[-1])) %>% filter(frac > 0.2)
-df  %>%
-  select(where(~ colSums(.) > 10))
+#Remove columns that have more than 20% 0 values
+zerocutoff<-nrow(features)*0.2
 
-res <- colSums(features==0)/nrow(featureMatrix)*100
-res<-as_tibble(res)
-res$mz<-colnames(features)
-#select those with more than 20%
-
-selectedft <-filter(res, value<20)
-
-ft<-selectedft$mz
+features[colSums(features > 0) <= zerocutoff]<- NULL
+apply( features , 2 , function(x) sum ( x == 0 ) )
 
 #select all features in original tibble
 features<-features%>% select(all_of(ft))
-#3679 KC + 3933 WT 
-KC<-replicate(3679, "KC")
-WT<-replicate(3933, "WT")
-alllabels<-c(KC,WT)
+#1negative 
+#spectra[[1998]]@metaData[["file"]]
+ASPC<-replicate(1268, "ASPC")
+BxPC<-replicate(1264, "BxPC")
+CFPAC<-replicate(1337, "CFPAC")
+HeLa<-replicate(1264, "HeLa")
+Panc1<-replicate(1484, "Panc1")
+Panc10<-replicate(1267, "Panc10")
+
+alllabels<-c(ASPC,BxPC,CFPAC,HeLa,Panc1,Panc10)
 #add labels
 features$sample<-alllabels
 features<-tibble::rowid_to_column(features, "id")
@@ -68,13 +68,16 @@ features<-tibble::rowid_to_column(features, "id")
 features <- features %>%
   select(id,sample, everything())
 
+#filter rows by mass to select cells Negative
+cells<-features[!(features$X804.574332386052==0|features$X830.606791452377)==0,]
+
 
 
 library(randomForest)
 require(caTools)
 library(caret)
 set.seed(222)
-rfdata<-features[,2:301]
+rfdata<-features[,2:115]
 rfdata$sample<-as_factor(rfdata$sample)
 ind <- sample(2, nrow(rfdata), replace = TRUE, prob = c(0.7, 0.3))
 train <- rfdata[ind==1,]
@@ -127,7 +130,7 @@ colors = rainbow(length(unique(features$sample)))
 names(colors) = unique(features$sample)
 
 ## Executing the algorithm on curated data
-tsne <- Rtsne(features[,3:301], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
+tsne <- Rtsne(features[,3:115], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
 #get labels
 spectranumcol<-features$id
 samplecol<-features$sample

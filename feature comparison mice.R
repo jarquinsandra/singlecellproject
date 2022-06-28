@@ -1,13 +1,13 @@
 tres<-t.test(group0$X100.0751, group1$X100.0751, alternative = "two.sided", var.equal = FALSE)
-group1<-filter(clusters,hdb_cluster==1)
+group1<-filter(clusters,hdb_cluster==-1)
 
-group2<-filter(clusters,hdb_cluster==2)
-group0<-filter(clusters,hdb_cluster==0)
+group2<-filter(clusters,hdb_cluster==0)
+group0<-filter(clusters,hdb_cluster==1)
 comparison1<-rbind(group1,group2)
 comparison1<-as_tibble(comparison1)
 stats <- data.frame( )
 counter<-3
-pdf("features_group1and2_2.pdf")
+pdf("features_group1and2.pdf")
 while (counter<ncol(comparison1)) {
   
   plotdt<-comparison1%>%dplyr::pull(counter)

@@ -1,8 +1,14 @@
-tres<-t.test(group0$X100.0751, group1$X100.0751, alternative = "two.sided", var.equal = FALSE)
+t.test(KC$X118.0857, WT$X118.0857, alternative = "two.sided", var.equal = FALSE)
 group1<-filter(clusters,hdb_cluster==-1)
 
-group2<-filter(clusters,hdb_cluster==0)
-group0<-filter(clusters,hdb_cluster==1)
+KC<-filter(clusters,hdb_cluster==0)
+WT<-filter(clusters,hdb_cluster==1)
+KC<-KC %>% filter(across(everything(), ~ !str_detect(., "WT")))
+WT<-WT %>% filter(across(everything(), ~ !str_detect(., "KC")))
+
+WTKC<-rbind(KC,WT)
+allcells<-rbind(KC,WT,unknown)
+
 comparison1<-rbind(group1,group2)
 comparison1<-as_tibble(comparison1)
 stats <- data.frame( )

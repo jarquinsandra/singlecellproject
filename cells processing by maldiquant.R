@@ -49,31 +49,31 @@ features[colSums(features > 0) <= zerocutoff]<- NULL
 apply( features , 2 , function(x) sum ( x == 0 ) )
 
 ####test for automatic label extraction
-i=1
-labelst<-tibble()
-for (i in 1:length(spectra)) {
-  label<-spectra[[i]]@metaData[["file"]]
-  labelst<-rbind(labelst,label)
-  i=+1
-}
-
-labels <- mutate_if(labelst, 
-                is.character, 
-                str_replace_all, 
-                pattern = "/Users/sandramartinez/Documents/MSData/mice_wtkras_20220405/raw/", 
-                replacement = "")
-labels <- mutate_if(labels, 
-                is.character, 
-                str_replace_all, 
-                pattern = ".mzML", 
-                replacement = "")
+# i=1
+# labelst<-tibble()
+# for (i in 1:length(spectra)) {
+#   label<-spectra[[i]]@metaData[["file"]]
+#   labelst<-rbind(labelst,label)
+#   i=+1
+# }
+# 
+# labels <- mutate_if(labelst, 
+#                 is.character, 
+#                 str_replace_all, 
+#                 pattern = "/Users/sandramartinez/Documents/MSData/mice_wtkras_20220405/raw/", 
+#                 replacement = "")
+# labels <- mutate_if(labels, 
+#                 is.character, 
+#                 str_replace_all, 
+#                 pattern = ".mzML", 
+#                 replacement = "")
 
 #3679 KC + 3933 WT 
-#KC<-replicate(3679, "KC")
-#WT<-replicate(3933, "WT")
-#alllabels<-c(KC,WT)
+KC<-replicate(3679, "KC")
+WT<-replicate(3933, "WT")
+alllabels<-c(KC,WT)
 #add labels
-features$sample<-labels
+features$sample<-alllabels
 features<-tibble::rowid_to_column(features, "id")
 #moving sample to first column
 features <- features %>%
@@ -87,7 +87,7 @@ library(randomForest)
 require(caTools)
 library(caret)
 set.seed(222)
-rfdata<-cells[,2:765]
+rfdata<-cells[,2:ncol(cells)]
 rfdata$sample<-as_factor(rfdata$sample)
 ind <- sample(2, nrow(rfdata), replace = TRUE, prob = c(0.7, 0.3))
 train <- rfdata[ind==1,]
@@ -140,7 +140,7 @@ colors = rainbow(length(unique(cells$sample)))
 names(colors) = unique(cells$sample)
 
 ## Executing the algorithm on curated data
-tsne <- Rtsne(cells[,3:765], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
+tsne <- Rtsne(cells[,3:ncol(cells)], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
 #get labels
 spectranumcol<-cells$id
 samplecol<-cells$sample
@@ -214,7 +214,7 @@ boruta.df<-as_tibble(boruta.df)
 
 names<-colnames(df)
 names<-sub('X', '', names)
-names<-names[3:166]
+names<-names[3:ncol(df)]
 names<-as.numeric(names)
 names<-round(names,digits=4)
 names<-as.character(names)

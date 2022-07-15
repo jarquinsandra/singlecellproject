@@ -3,11 +3,19 @@ group1<-filter(clusters,hdb_cluster==-1)
 
 KC<-filter(clusters,hdb_cluster==0)
 WT<-filter(clusters,hdb_cluster==1)
+mix<-filter(clusters,hdb_cluster==-1)
 KC<-KC %>% filter(across(everything(), ~ !str_detect(., "WT")))
 WT<-WT %>% filter(across(everything(), ~ !str_detect(., "KC")))
+mixKC<-mix %>% filter(across(everything(), ~ !str_detect(., "WT")))
+mixWT<-mix %>% filter(across(everything(), ~ !str_detect(., "KC")))
+mixlabelsKC<-replicate(212, "KC_3")
+mixlabelsWT<-replicate(276, "WT_3")
+mixKC$sample<-mixlabelsKC
+mixWT$sample<-mixlabelsWT
+
 
 WTKC<-rbind(KC,WT)
-allcells<-rbind(KC,WT,unknown)
+allcells<-rbind(KC,WT,mixKC,mixWT)
 
 comparison1<-rbind(group1,group2)
 comparison1<-as_tibble(comparison1)

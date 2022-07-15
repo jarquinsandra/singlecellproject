@@ -18,7 +18,7 @@ library("ggpubr")
 library(RVAideMemoire)
 
 ## get names of all .mzML files in current working directory
-path <- "~/Sandra_MS_data/maldiquant_cells/pos_raw/raw"
+path <- "~/Sandra_MS_data/techincalnote/positive"
 spectra<-importMzMl(path = path)
 #normalization to TIC
 

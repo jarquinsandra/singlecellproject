@@ -18,19 +18,16 @@ library("ggpubr")
 library(RVAideMemoire)
 
 ## get names of all .mzML files in current working directory
-path <- "~/Sandra_MS_data/techincalnote/positive"
+path <- "~/Sandra_MS_data/technicalnote/positive"
+#import spectrum
 spectra<-importMzMl(path = path)
 #normalization to TIC
-
 spectra <- calibrateIntensity(spectra, method="TIC")
-
-## Peak picking, you can change SNR however for orbitrap data the noise is very low
+## Peak picking, with signal to noise filtering
 peaks<-detectPeaks(spectra, SNR=3)
 ## Peak alignment using the warping function of Maldiquant
-
 warpingFunctions<-determineWarpingFunctions(peaks,allowNoMatches=TRUE)
 peaks<-warpMassPeaks(peaks,warpingFunctions)
-
 # binPeaks tolerance is expressed in delta mass / mass, we want it in ppm:
 #tol.ppm <- 5
 #tol.maldiquant <- tol.ppm / 1e5
@@ -54,36 +51,12 @@ zerocutoff<-nrow(features)*0.2
 features[colSums(features > 0) <= zerocutoff]<- NULL
 #apply( features , 2 , function(x) sum ( x == 0 ) )
 
-# #1negative 
-# #spectra[[1998]]@metaData[["file"]]
- #ASPC<-replicate(1268, "ASPC")
- #BxPC<-replicate(1264, "BxPC")
- #CFPAC<-replicate(1337, "CFPAC")
- #HeLa<-replicate(1264, "HeLa")
- #Panc1<-replicate(1484, "Panc1")
- #Panc10<-replicate(1267, "Panc10")
-# 
- #alllabels<-c(ASPC,BxPC,CFPAC,HeLa,Panc1,Panc10)
-# #1positive 
+ #1positive 
 # spectra[[1998]]@metaData[["file"]]
- #ASPC<-replicate(1265, "ASPC")
- #BxPC<-replicate(1065, "BxPC")
- #CFPAC<-replicate(1265, "CFPAC")
- #HeLa<-replicate(1263, "HeLa")
- #Panc1<-replicate(1265, "Panc1")
- #Panc10<-replicate(1262, "Panc10")
- #alllabels<-c(ASPC,BxPC,CFPAC,HeLa,Panc1,Panc10)
- 
-# 
- 
- # #cancer markers
- # #spectra[[1998]]@metaData[["file"]]
- ASPC<-replicate(1265, "PC")
- BxPC<-replicate(1065, "BxPC")
- CFPAC<-replicate(1265, "PC")
- HeLa<-replicate(1263, "HeLa")
- Panc<-replicate(2527, "PC")
- alllabels<-c(ASPC,BxPC,CFPAC,HeLa,Panc)
+ ASPC<-replicate(1265, "ASPC-1")
+ HeLa<-replicate(1262, "HeLa")
+ Panc10<-replicate(1263, "Panc 10.05")
+ alllabels<-c(ASPC,HeLa,Panc10)
  
 #add labels
 features$sample<-alllabels
@@ -91,61 +64,20 @@ features<-tibble::rowid_to_column(features, "id")
 #moving sample to first column
 features <- features %>%
   select(id,sample, everything())
-
-#filter rows by mass to select cells Negative
-#cells<-features[!(features$X804.574332386052==0|features$X830.606791452377)==0,]
 #filter rows by mass to select cells positive
 
-cells<-features[!(features$X732.55685675744==0|features$X760.589528926264)==0,]
+names<-colnames(features)
+names<-sub('X', '', names)
+names<-names[3:ncol(features)]
+names<-as.numeric(names)
+names<-round(names,digits=4)
+names<-as.character(names)
+#add X to characters
+names<-paste0("X", names)
+labels<-c("sample","id",names)
+colnames(features)<-labels
 
-
-
-library(randomForest)
-require(caTools)
-library(caret)
-set.seed(222)
-rfdata<-cells[,2:ncol(features)]
-rfdata$sample<-as_factor(rfdata$sample)
-ind <- sample(2, nrow(rfdata), replace = TRUE, prob = c(0.7, 0.3))
-train <- rfdata[ind==1,]
-test <- rfdata[ind==2,]
-
-
-dim(train)
-dim(test)
-
-
-rf <- randomForest(
-  sample ~ .,
-  data=test
-)
-#Prediction & Confusion Matrix – train data
-p1 <- predict(rf, train)
-confusionMatrix(p1, train$sample)
-#Prediction & Confusion Matrix – test data
-p2 <- predict(rf, test)
-confusionMatrix(p2, test$sample)
-
-
-hist(treesize(rf),
-     main = "No. of Nodes for the Trees",
-     col = "green")
-#Variable Importance
-tiff(filename = "All_adypocites_gini.tiff",
-     width = 30, height = 20, units = "cm",res=1500)
-varImpPlot(rf,
-           sort = T,
-           n.var = 30,
-           main = "Top 30 - Variable Importance")
-dev.off()
-importance(rf)
-
-capture.output(rf, file = "rf.txt", append = TRUE)
-
-feat_imp_df <- importance(rf) %>% 
-  data.frame() %>% 
-  mutate(feature = row.names(.)) 
-
+cells<-features[!(features$X732.5554==0|features$X760.5894)==0,]
 
 library(Rtsne)
 
@@ -174,7 +106,7 @@ tSNE_df %>%
              color = sample))+
   geom_point()+
   theme(legend.position="bottom")
-ggsave("tSNE_all_maldiquant.png")
+ggsave("technicalnote.png")
 
 #Boruta
 library(Boruta)

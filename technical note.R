@@ -79,6 +79,9 @@ colnames(features)<-labels
 
 cells<-features[!(features$X732.5554==0|features$X760.5894)==0,]
 
+
+
+
 library(Rtsne)
 
 ## Curating the database for analysis with both t-SNE and PCA

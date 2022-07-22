@@ -16,9 +16,12 @@ library("factoextra")
 library(tidyverse)
 library("ggpubr")
 library(RVAideMemoire)
-
+# reduce matrix size, using a summarising function (default, mean)
 ## get names of all .mzML files in current working directory
+#windows
 path <- "~/Sandra_MS_data/technicalnote/positive"
+#mac
+path <-"/Users/sandramartinez/Downloads/drive-download-20220715T123036Z-001"
 #import spectrum
 spectra<-importMzMl(path = path)
 #normalization to TIC
@@ -89,10 +92,10 @@ colors = rainbow(length(unique(cells$sample)))
 names(colors) = unique(cells$sample)
 
 ## Executing the algorithm on curated data
-tsne <- Rtsne(cells[,3:ncol(features)], dims = 2, perplexity=100, verbose=TRUE, max_iter = 1000)
+tsne <- Rtsne(cells[,3:ncol(features)], dims = 2, perplexity=50, verbose=TRUE, max_iter = 5000)
 #get labels
-spectranumcol<-cells$id
-samplecol<-cells$sample
+spectranumcol<-cells$sample
+samplecol<-cells$id
 tSNE_df <- tsne$Y %>% 
   as.data.frame() %>%
   dplyr::rename(tsne1="V1",
@@ -104,69 +107,101 @@ tSNE_df %>%
   ggplot(aes(x = tsne1, 
              y = tsne2,
              color = sample))+
-  geom_point()+
-  theme(legend.position="bottom")
-ggsave("technicalnote.png")
-
-#Boruta
-library(Boruta)
-boruta <- Boruta(sample ~ ., data = rfdata, doTrace = 1, maxRuns = 100)
-
-print(boruta)
+  geom_point(size=0.5)+
+  theme_classic() +
+  theme(legend.position = "top",text = element_text(size = 20),panel.border = element_rect(colour = "black", fill=NA, size=1))+ guides(colour = guide_legend(override.aes = list(size=5)))
+ggsave("technicalnote120_3000.png")
 
 
-plot(boruta, xlab = "", xaxt = "n")
-lz<-lapply(1:ncol(boruta$ImpHistory),function(i)
-  boruta$ImpHistory[is.finite(boruta$ImpHistory[,i]),i])
-names(lz) <- colnames(boruta$ImpHistory)
-Labels <- sort(sapply(lz,median))
+library(plotly)
+library(ggfortify)
 
-axis(side = 1,las=2,labels = names(Labels),
-     at = 1:ncol(boruta$ImpHistory), cex.axis = 0.7)
-#Select features
-selected_features<-getSelectedAttributes(boruta, withTentative = F)
-boruta.df <- attStats(boruta)
-class(boruta.df)
+df <- cells[3:ncol(cells)]
+pca_res <- prcomp(df, scale. = TRUE)
+
+p <- autoplot(pca_res, data = cells, colour = 'id')
+
+ggplotly(p)
 
 
+columnmax<-apply(featureMatrix, 2, max)
 
-cells<-cells %>% 
-  mutate_if(is.numeric, round,digits=4)
+#sort and select the 75 most intense values
+colmax<-sort(columnmax,decreasing=TRUE)
+colmaxselection<-as.matrix(colmax[1:50])
+colmaxselection=as.vector(rownames(colmaxselection))
 
-#transpose the matrix including column names as a column called featur
-trans_test2<- data.table::transpose(cells,keep.names = "feature")
-trans_test2<-trans_test2[-2,]
-trans_test2<-as_tibble(trans_test2)
+#limiting matrix to selection
+max_normout_featureMatrix<-featureMatrix[,colmaxselection]
+#data<-- max_normout_featureMatrix
 
-####Get selected features from the table
-keep<- c("sample", "id", selected_features)
+## Create heatmap
 
-df <- cells[keep]
+t_max_normout_featureMatrix<-t(max_normout_featureMatrix)
+colnames(t_max_normout_featureMatrix)<-alllabels
 
-#get only confirmed features
-boruta.df<-filter(boruta.df, decision=='Confirmed')
-mz<-rownames(boruta.df)
-boruta.df$mz<-mz
-boruta.df$mz<-gsub("X","",boruta.df$mz)
-boruta.df$mz<-as.numeric(boruta.df$mz)
-boruta.df$mz<-round(boruta.df$mz,digits=4)
-boruta.df<-as_tibble(boruta.df)
-write.csv(boruta.df, file='featuresimportance.csv') 
-
-names<-colnames(df)
-names<-sub('X', '', names)
-names<-names[3:ncol(df)]
-names<-as.numeric(names)
-names<-round(names,digits=4)
-names<-as.character(names)
-#names<-names[names > 400]
-#add X to characters
-names<-paste0("X", names)
-labels<-c("sample","id",names,"hdb_prob", "hdb_cluster")
-colnames(df)<-labels
-write.csv(df, file='cellsborutaselectedfeatures_filtered.csv') 
+pheatmap(t_max_normout_featureMatrix,scale="row",cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows="euclidean", clustering_distance_cols="euclidean", clustering_methode="complete",cellwidth = 10, cellheight = 10, fontsize=5, filename="metabolic-heatmapSNR1_all_50norm.pdf")
+#get names from the mz values
+library(randomForest)
+require(caTools)
+library(caret)
+set.seed(123)
+rfdata<-cells[,2:ncol(cells)]
+rfdata$sample<-as_factor(rfdata$sample)
+ind <- sample(2, nrow(rfdata), replace = TRUE, prob = c(0.95, 0.05))
+train <- rfdata[ind==1,]
+test <- rfdata[ind==2,]
 
 
+dim(train)
+dim(test)
 
+columnmax<-apply(test[2:ncol(test)], 2, max)
 
+#sort and select the 75 most intense values
+colmax<-sort(columnmax,decreasing=TRUE)
+colmaxselection<-as.matrix(colmax[0:150])
+colmaxselection=as.vector(rownames(colmaxselection))
+
+#limiting matrix to selection
+max_normout_featureMatrix<-test[,colmaxselection]
+#data<-- max_normout_featureMatrix
+
+## Create heatmap
+
+t_max_normout_featureMatrix<-t(max_normout_featureMatrix)
+colnames(t_max_normout_featureMatrix)<-test$sample
+
+pheatmap(t_max_normout_featureMatrix,color=rainbow(50),scale="row",cluster_cols = FALSE, cluster_rows = FALSE, clustering_distance_rows="euclidean", clustering_distance_cols="euclidean", clustering_methode="complete",cellwidth = 1, cellheight = 1, fontsize=1, filename="metabolic-heatmapSNR1_all_50norm.pdf")
+#pheatmap(t_max_normout_featureMatrix,scale="row",cluster_cols = TRUE, cluster_rows = TRUE, clustering_distance_rows="euclidean", clustering_distance_cols="euclidean", clustering_methode="complete",cellwidth = 10, cellheight = 10, fontsize=5, filename="metabolic-heatmapSNR1_all_50norm.pdf")
+
+library(ggplot2)
+library(patchwork)
+# Wide to long transformation
+data_for_ggplot <- as.data.frame(max_normout_featureMatrix) %>% 
+  mutate(row = rownames(.)) %>% 
+  tidyr::pivot_longer(-row, names_to = "col") %>%
+  mutate(row = as.numeric(row), col = readr::parse_number(col))
+
+# with geom_tile()
+p1 <- ggplot(data_for_ggplot, aes(x = col, y = row, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "white", mid = "darkorange", high = "black",
+    limits = c(0, 3), midpoint = 1.5, oob = scales::squish
+  ) +
+  labs(title = "geom_tile") +
+  theme_void() +
+  theme(legend.position = "none")
+# with geom_raster()
+p2 <- ggplot(data_for_ggplot, aes(x = col, y = row, fill = value)) +
+  geom_raster() +
+  scale_fill_gradient2(
+    low = "white", mid = "darkorange", high = "black",
+    limits = c(0, 3), midpoint = 1.5, oob = scales::squish
+  ) +
+  labs(title = "geom_raster") +
+  theme_void() +
+  theme(legend.position = "none")
+p1 + p2
 
